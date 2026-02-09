@@ -1,0 +1,97 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model City {
+  id        Int      @id @default(autoincrement())
+  name      String
+  stateCode String   @db.VarChar(2)
+  stateName String
+  stateSlug String
+  latitude  Float
+  longitude Float
+  population Int?
+  slug      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  attorneyOffices AttorneyOffice[]
+
+  @@map("cities")
+}
+
+model AttorneyOffice {
+  id                          Int      @id @default(autoincrement())
+  googlePlaceId               String   @unique
+  displayName                 String
+  formattedAddress            String?
+  shortAddress                String?
+  primaryType                 String?
+  primaryTypeDisplayName      String?
+  latitude                    Float
+  longitude                   Float
+  googleMapsUri               String?
+  websiteUri                  String?
+  acceptsCreditCards          Boolean?
+  acceptsDebitCards           Boolean?
+  cashOnly                    Boolean?
+  acceptsNfc                  Boolean?
+  freeParkingLot              Boolean?
+  paidParkingLot              Boolean?
+  freeStreetParking           Boolean?
+  valetParking                Boolean?
+  freeGarageParking           Boolean?
+  paidGarageParking           Boolean?
+  wheelchairAccessibleParking  Boolean?
+  wheelchairAccessibleEntrance Boolean?
+  wheelchairAccessibleRestroom Boolean?
+  wheelchairAccessibleSeating  Boolean?
+  practiceAreas               String[]
+  cityId                      Int
+  lastApiRefresh              DateTime?
+  createdAt                   DateTime @default(now())
+  updatedAt                   DateTime @updatedAt
+
+  city           City            @relation(fields: [cityId], references: [id])
+  secondaryHours SecondaryHour[]
+  leads          Lead[]
+
+  @@map("attorney_offices")
+}
+
+model SecondaryHour {
+  id               Int      @id @default(autoincrement())
+  attorneyOfficeId Int
+  hoursType        String
+  dayOfWeek        Int
+  openHour         Int
+  openMinute       Int      @default(0)
+  closeHour        Int
+  closeMinute      Int      @default(0)
+  createdAt        DateTime @default(now())
+
+  attorneyOffice AttorneyOffice @relation(fields: [attorneyOfficeId], references: [id], onDelete: Cascade)
+
+  @@map("secondary_hours")
+}
+
+model Lead {
+  id               Int      @id @default(autoincrement())
+  attorneyOfficeId Int?
+  sourcePageUrl    String?
+  clientName       String?
+  clientPhone      String?
+  clientEmail      String?
+  caseType         String?
+  preferredTime    String?
+  createdAt        DateTime @default(now())
+
+  attorneyOffice AttorneyOffice? @relation(fields: [attorneyOfficeId], references: [id])
+
+  @@map("leads")
+}

@@ -9,8 +9,11 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        background: "var(--background)",
-        foreground: "var(--foreground)",
+        navy: '#1a2332',
+        'lh-green': '#2d8a4e',
+        'lh-green-light': '#e8f5e9',
+        amber: '#e8a838',
+        'amber-light': '#fff8e1',
       },
     },
   },
