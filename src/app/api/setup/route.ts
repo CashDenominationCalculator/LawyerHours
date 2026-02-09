@@ -1,10 +1,19 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { CITIES } from '@/lib/constants';
 
 export const maxDuration = 60;
 
-export async function POST() {
+export async function POST(request: NextRequest) {
+  // Protect setup endpoint with API key
+  const url = new URL(request.url);
+  const key = url.searchParams.get('key');
+  const apiKey = process.env.GOOGLE_PLACES_API_KEY;
+  
+  if (!key || key !== apiKey) {
+    return NextResponse.json({ error: 'Unauthorized. Pass ?key=YOUR_API_KEY' }, { status: 401 });
+  }
+
   try {
     // Create tables using raw SQL
     await prisma.$executeRawUnsafe(`
@@ -86,7 +95,7 @@ export async function POST() {
       )
     `);
 
-    // Seed 50 cities
+    // Seed cities
     let seeded = 0;
     for (const city of CITIES) {
       try {
@@ -104,7 +113,7 @@ export async function POST() {
 
     return NextResponse.json({
       success: true,
-      message: 'Database tables created and 50 cities seeded',
+      message: 'Database tables created and cities seeded',
       citiesSeeded: seeded,
     });
   } catch (error: unknown) {
