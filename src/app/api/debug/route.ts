@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import prisma from '@/lib/prisma';
 
 export async function GET() {
   const envVars = [
@@ -8,7 +9,6 @@ export async function GET() {
     'POSTGRES_PRISMA_URL',
     'POSTGRES_HOST',
     'POSTGRES_USER',
-    'POSTGRES_PASSWORD',
     'POSTGRES_DATABASE',
     'GOOGLE_PLACES_API_KEY',
   ];
@@ -17,7 +17,8 @@ export async function GET() {
   for (const key of envVars) {
     const val = process.env[key];
     if (val) {
-      result[key] = val.substring(0, 25) + '...[SET]';
+      // Show structure but mask sensitive parts
+      result[key] = val.replace(/:[^@]+@/, ':***@').substring(0, 80) + (val.length > 80 ? '...' : '');
     } else {
       result[key] = '[NOT SET]';
     }
@@ -29,6 +30,15 @@ export async function GET() {
     : process.env.DATABASE_URL 
       ? 'DATABASE_URL (fallback)' 
       : 'NONE - will fail';
+
+  // Try a simple query  
+  try {
+    const cityCount = await prisma.city.count();
+    const attorneyCount = await prisma.attorneyOffice.count();
+    result['_db_test'] = `OK: ${cityCount} cities, ${attorneyCount} attorneys`;
+  } catch (err) {
+    result['_db_test'] = `ERROR: ${err instanceof Error ? err.message.substring(0, 200) : 'unknown'}`;
+  }
 
   return NextResponse.json(result);
 }
