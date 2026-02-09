@@ -126,6 +126,99 @@ function capitalize(s: string): string {
 }
 
 // ==========================================
+// PARSE REGULAR OPENING HOURS (FALLBACK)
+// ==========================================
+/**
+ * When no secondaryOpeningHours are available, derive "extended" hours
+ * from regularOpeningHours. We look for:
+ *  - Evening hours: entries where close hour is >= 18 on weekdays
+ *  - Weekend hours: any entries on Saturday (6) or Sunday (0)
+ *  - Late night: entries where close hour >= 21
+ */
+export function parseRegularOpeningHours(
+  periods: { open: { day: number; hour: number; minute: number }; close?: { day: number; hour: number; minute: number } }[]
+): SecondaryHourWindow[] {
+  if (!periods || !Array.isArray(periods)) return [];
+
+  const windows: SecondaryHourWindow[] = [];
+
+  for (const period of periods) {
+    const openDay = period.open.day;
+    const openHour = period.open.hour;
+    const openMinute = period.open.minute ?? 0;
+    const closeDay = period.close?.day ?? openDay;
+    const closeHour = period.close?.hour ?? 23;
+    const closeMinute = period.close?.minute ?? 59;
+
+    const isWeekend = openDay === 0 || openDay === 6;
+    const isEvening = closeHour >= 18 && !isWeekend;
+    const isLateNight = closeHour >= 21;
+
+    // Only include windows that are "extended" - evening, weekend, or late night
+    if (isWeekend || isEvening || isLateNight) {
+      // For weekday evening entries, only capture the evening portion (after 17:00)
+      if (!isWeekend && isEvening && openHour < 17) {
+        windows.push({
+          type: 'REGULAR_HOURS',
+          dayOfWeek: openDay,
+          openHour: 17,
+          openMinute: 0,
+          closeHour: closeDay === openDay ? closeHour : 23,
+          closeMinute: closeDay === openDay ? closeMinute : 59,
+          label: categorizeWindow('REGULAR_HOURS', openDay, 17, closeDay === openDay ? closeHour : 23),
+        });
+      } else {
+        // Weekend or already an evening start
+        if (openDay === closeDay) {
+          windows.push({
+            type: 'REGULAR_HOURS',
+            dayOfWeek: openDay,
+            openHour,
+            openMinute,
+            closeHour,
+            closeMinute,
+            label: categorizeWindow('REGULAR_HOURS', openDay, openHour, closeHour),
+          });
+        } else {
+          // Multi-day period spanning weekend
+          let currentDay = openDay;
+          while (currentDay !== closeDay) {
+            const isFirstDay = currentDay === openDay;
+            const dayIsWeekend = currentDay === 0 || currentDay === 6;
+            if (dayIsWeekend || isEvening) {
+              windows.push({
+                type: 'REGULAR_HOURS',
+                dayOfWeek: currentDay,
+                openHour: isFirstDay ? openHour : 0,
+                openMinute: isFirstDay ? openMinute : 0,
+                closeHour: 23,
+                closeMinute: 59,
+                label: categorizeWindow('REGULAR_HOURS', currentDay, isFirstDay ? openHour : 0, 23),
+              });
+            }
+            currentDay = (currentDay + 1) % 7;
+          }
+          // Add close day if weekend
+          if (closeDay === 0 || closeDay === 6) {
+            windows.push({
+              type: 'REGULAR_HOURS',
+              dayOfWeek: closeDay,
+              openHour: 0,
+              openMinute: 0,
+              closeHour,
+              closeMinute,
+              label: categorizeWindow('REGULAR_HOURS', closeDay, 0, closeHour),
+            });
+          }
+        }
+      }
+    }
+  }
+
+  return windows;
+}
+
+// ==========================================
 // CHECK AVAILABILITY
 // ==========================================
 export interface DbSecondaryHour {
