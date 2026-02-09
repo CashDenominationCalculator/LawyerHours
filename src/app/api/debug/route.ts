@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 
 export async function GET() {
-  // Check which Supabase/Postgres env vars are set (values hidden for security)
   const envVars = [
     'DATABASE_URL',
     'POSTGRES_URL',
@@ -11,25 +10,25 @@ export async function GET() {
     'POSTGRES_USER',
     'POSTGRES_PASSWORD',
     'POSTGRES_DATABASE',
-    'SUPABASE_URL',
-    'SUPABASE_ANON_KEY',
-    'SUPABASE_PUBLISHABLE_KEY',
-    'NEXT_PUBLIC_SUPABASE_URL',
-    'NEXT_PUBLIC_SUPABASE_ANON_KEY',
     'GOOGLE_PLACES_API_KEY',
-    'NEXT_PUBLIC_SITE_URL',
   ];
 
   const result: Record<string, string> = {};
   for (const key of envVars) {
     const val = process.env[key];
     if (val) {
-      // Show first 20 chars + mask rest
-      result[key] = val.substring(0, 20) + '...[SET]';
+      result[key] = val.substring(0, 25) + '...[SET]';
     } else {
       result[key] = '[NOT SET]';
     }
   }
+
+  // Show which URL Prisma will actually use
+  result['_prisma_will_use'] = process.env.POSTGRES_PRISMA_URL 
+    ? 'POSTGRES_PRISMA_URL' 
+    : process.env.DATABASE_URL 
+      ? 'DATABASE_URL (fallback)' 
+      : 'NONE - will fail';
 
   return NextResponse.json(result);
 }

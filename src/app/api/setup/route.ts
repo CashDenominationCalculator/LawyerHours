@@ -1,13 +1,11 @@
 import { NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
+import prisma from '@/lib/prisma';
 import { CITIES } from '@/lib/constants';
 
 export const maxDuration = 60;
 
 export async function POST() {
   try {
-    const prisma = new PrismaClient();
-
     // Create tables using raw SQL
     await prisma.$executeRawUnsafe(`
       CREATE TABLE IF NOT EXISTS cities (
@@ -103,8 +101,6 @@ export async function POST() {
         console.error(`Failed to seed ${city.name}:`, e);
       }
     }
-
-    await prisma.$disconnect();
 
     return NextResponse.json({
       success: true,
