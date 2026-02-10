@@ -3,6 +3,7 @@ import prisma from '@/lib/prisma';
 import { getCityBySlug } from '@/lib/constants';
 import {
   fetchLawyersSmart,
+  fetchLawyersComprehensive,
   parseGooglePlace,
   validateApiKey,
   type FetchStrategy,
@@ -32,6 +33,7 @@ export async function POST(
     const url = new URL(request.url);
     const strategyParam = url.searchParams.get('strategy') as FetchStrategy | null;
     const forceRefresh = url.searchParams.get('force') === 'true';
+    const mode = url.searchParams.get('mode') || 'comprehensive'; // 'comprehensive' | 'nearby-only'
 
     // Validate city
     const cityData = getCityBySlug(params.citySlug);
@@ -97,21 +99,50 @@ export async function POST(
       });
     }
 
-    // Fetch from Google Places API (smart strategy)
-    const { places, strategy, apiCalls } = await fetchLawyersSmart(
-      cityData.lat,
-      cityData.lng,
-      apiKey!,
-      cityData.pop,
-      strategyParam || undefined
-    );
+    // Fetch from Google Places API
+    let allPlaces;
+    let usedStrategy: FetchStrategy = 'single';
+    let totalApiCalls = 0;
+    let nearbyCount = 0;
+    let textSearchCount = 0;
+
+    if (mode === 'comprehensive') {
+      // Full comprehensive fetch: Nearby + Text Search per practice area
+      const result = await fetchLawyersComprehensive(
+        cityData.name,
+        cityData.stateCode,
+        cityData.lat,
+        cityData.lng,
+        apiKey!,
+        cityData.pop,
+        { strategy: strategyParam || undefined }
+      );
+      allPlaces = result.places;
+      usedStrategy = result.strategy;
+      totalApiCalls = result.totalApiCalls;
+      nearbyCount = result.nearbyCount;
+      textSearchCount = result.textSearchCount;
+    } else {
+      // Nearby-only mode (cheaper, fewer API calls)
+      const result = await fetchLawyersSmart(
+        cityData.lat,
+        cityData.lng,
+        apiKey!,
+        cityData.pop,
+        strategyParam || undefined
+      );
+      allPlaces = result.places;
+      usedStrategy = result.strategy;
+      totalApiCalls = result.apiCalls;
+      nearbyCount = result.places.length;
+    }
 
     let created = 0;
     let updated = 0;
     let skipped = 0;
     const errors: string[] = [];
 
-    for (const place of places) {
+    for (const place of allPlaces) {
       const parsed = parseGooglePlace(place);
 
       try {
@@ -149,11 +180,21 @@ export async function POST(
         };
 
         if (existing) {
-          // Update existing attorney
+          // Update existing attorney — merge practice areas instead of replacing
+          const mergedSet = new Set<string>([
+            ...(existing.practiceAreas || []),
+            ...parsed.practiceAreas,
+          ]);
+          const mergedPracticeAreas = Array.from(mergedSet);
+          // Remove 'general' if we now have specific areas
+          const specificAreas = mergedPracticeAreas.filter(a => a !== 'general');
+          const finalPracticeAreas = specificAreas.length > 0 ? specificAreas : ['general'];
+
           await prisma.attorneyOffice.update({
             where: { googlePlaceId: parsed.googlePlaceId },
             data: {
               ...attorneyData,
+              practiceAreas: finalPracticeAreas,
               cityId: city.id, // Re-associate with correct city
             },
           });
@@ -207,7 +248,7 @@ export async function POST(
     const progress: FetchProgress = {
       city: `${cityData.name}, ${cityData.stateCode}`,
       status: 'complete',
-      totalFromApi: places.length,
+      totalFromApi: allPlaces.length,
       created,
       updated,
       skipped,
@@ -217,8 +258,11 @@ export async function POST(
     return NextResponse.json({
       success: true,
       ...progress,
-      strategy,
-      apiCalls,
+      mode,
+      strategy: usedStrategy,
+      apiCalls: totalApiCalls,
+      nearbyCount,
+      textSearchCount,
       errors: errors.length > 0 ? errors : undefined,
     });
   } catch (error: unknown) {
@@ -282,6 +326,19 @@ export async function GET(
       },
     });
 
+    // Count practice area distribution
+    const allAttorneys = await prisma.attorneyOffice.findMany({
+      where: { cityId: city.id },
+      select: { practiceAreas: true },
+    });
+    
+    const practiceAreaCounts: Record<string, number> = {};
+    for (const a of allAttorneys) {
+      for (const pa of a.practiceAreas) {
+        practiceAreaCounts[pa] = (practiceAreaCounts[pa] || 0) + 1;
+      }
+    }
+
     return NextResponse.json({
       city: `${cityData.name}, ${cityData.stateCode}`,
       slug: cityData.slug,
@@ -290,6 +347,7 @@ export async function GET(
       lastRefresh: lastRefresh?.toISOString() || null,
       hoursSinceRefresh: hoursSinceRefresh ? parseFloat(hoursSinceRefresh.toFixed(1)) : null,
       needsFetch: !lastRefresh || hoursSinceRefresh! > 168, // 1 week
+      practiceAreas: practiceAreaCounts,
     });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Unknown error';

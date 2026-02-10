@@ -5,6 +5,7 @@ import { classifyPracticeAreas, parseGoogleSecondaryHours, parseRegularOpeningHo
 // ==========================================
 
 const API_ENDPOINT = 'https://places.googleapis.com/v1/places:searchNearby';
+const TEXT_SEARCH_ENDPOINT = 'https://places.googleapis.com/v1/places:searchText';
 
 const FIELD_MASK = [
   'places.id',
@@ -22,6 +23,30 @@ const FIELD_MASK = [
   'places.googleMapsUri',
   'places.websiteUri',
 ].join(',');
+
+// ==========================================
+// PRACTICE AREA TEXT SEARCH QUERIES
+// ==========================================
+
+// These queries are used with the Text Search API to find
+// specific types of attorneys that the generic "lawyer" type won't distinguish
+const PRACTICE_AREA_SEARCH_QUERIES: Record<string, string[]> = {
+  'tax': ['tax attorney', 'tax lawyer', 'IRS attorney', 'tax resolution'],
+  'personal-injury': ['personal injury attorney', 'personal injury lawyer', 'injury lawyer'],
+  'criminal-defense': ['criminal defense attorney', 'criminal defense lawyer', 'criminal lawyer'],
+  'dui': ['DUI attorney', 'DUI lawyer', 'DWI attorney'],
+  'divorce': ['divorce attorney', 'divorce lawyer'],
+  'family-law': ['family law attorney', 'family lawyer', 'custody attorney'],
+  'immigration': ['immigration attorney', 'immigration lawyer', 'visa attorney'],
+  'bankruptcy': ['bankruptcy attorney', 'bankruptcy lawyer'],
+  'real-estate': ['real estate attorney', 'real estate lawyer', 'property attorney'],
+  'estate-planning': ['estate planning attorney', 'probate attorney', 'wills and trusts attorney'],
+  'employment': ['employment attorney', 'employment lawyer', 'labor attorney'],
+  'workers-compensation': ['workers compensation attorney', 'workers comp lawyer'],
+  'medical-malpractice': ['medical malpractice attorney', 'medical malpractice lawyer'],
+  'car-accident': ['car accident attorney', 'auto accident lawyer'],
+  'traffic-ticket': ['traffic ticket attorney', 'traffic lawyer'],
+};
 
 // ==========================================
 // TYPES
@@ -73,6 +98,11 @@ export interface GooglePlaceResult {
   };
   googleMapsUri?: string;
   websiteUri?: string;
+}
+
+// Extended result that carries practice area context from Text Search
+export interface GooglePlaceResultWithContext extends GooglePlaceResult {
+  _searchContext?: string; // practice area slug from text search
 }
 
 export interface ParsedAttorney {
@@ -147,7 +177,7 @@ class RateLimiter {
 const rateLimiter = new RateLimiter(5); // 5 requests per second
 
 // ==========================================
-// CORE FETCH FUNCTION
+// CORE FETCH FUNCTION (Nearby Search)
 // ==========================================
 
 export async function fetchNearbyLawyers(
@@ -192,6 +222,113 @@ export async function fetchNearbyLawyers(
 
   const data = await response.json();
   return data.places || [];
+}
+
+// ==========================================
+// TEXT SEARCH FUNCTION (for specific practice areas)
+// ==========================================
+
+/**
+ * Search for specific types of attorneys using Google Places Text Search API.
+ * This returns attorneys that Google specifically recognizes as that type,
+ * which is much more accurate than keyword-matching display names.
+ *
+ * Example: "tax attorney in Dallas, TX" returns actual tax attorneys,
+ * not generic law firms.
+ */
+export async function fetchLawyersByTextSearch(
+  textQuery: string,
+  latitude: number,
+  longitude: number,
+  apiKey: string,
+  radius: number = 25000,
+  maxResults: number = 20
+): Promise<GooglePlaceResult[]> {
+  await rateLimiter.wait();
+
+  const response = await fetch(TEXT_SEARCH_ENDPOINT, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Goog-Api-Key': apiKey,
+      'X-Goog-FieldMask': FIELD_MASK,
+    },
+    body: JSON.stringify({
+      textQuery,
+      locationBias: {
+        circle: {
+          center: { latitude, longitude },
+          radius,
+        },
+      },
+      maxResultCount: maxResults,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    let errorDetail = errorText;
+    try {
+      const parsed = JSON.parse(errorText);
+      errorDetail = parsed.error?.message || parsed.error?.status || errorText;
+    } catch {
+      // use raw text
+    }
+    throw new Error(`Google Places Text Search API error ${response.status}: ${errorDetail}`);
+  }
+
+  const data = await response.json();
+  return data.places || [];
+}
+
+/**
+ * Fetch lawyers for specific practice areas using Text Search.
+ * Makes one API call per practice area query (first query only to limit costs).
+ * Returns places tagged with their search context (practice area slug).
+ */
+export async function fetchLawyersByPracticeArea(
+  cityName: string,
+  stateCode: string,
+  latitude: number,
+  longitude: number,
+  apiKey: string,
+  practiceAreaSlugs?: string[] // if not provided, fetch top practice areas
+): Promise<{ places: GooglePlaceResultWithContext[]; apiCalls: number }> {
+  const slugsToFetch = practiceAreaSlugs || Object.keys(PRACTICE_AREA_SEARCH_QUERIES);
+  const seenIds = new Set<string>();
+  const allPlaces: GooglePlaceResultWithContext[] = [];
+  let apiCalls = 0;
+
+  for (const slug of slugsToFetch) {
+    const queries = PRACTICE_AREA_SEARCH_QUERIES[slug];
+    if (!queries || queries.length === 0) continue;
+
+    // Use the first (most common) query for each practice area
+    const query = `${queries[0]} in ${cityName}, ${stateCode}`;
+
+    try {
+      const places = await fetchLawyersByTextSearch(query, latitude, longitude, apiKey);
+      apiCalls++;
+
+      for (const place of places) {
+        if (!seenIds.has(place.id)) {
+          seenIds.add(place.id);
+          allPlaces.push({ ...place, _searchContext: slug });
+        } else {
+          // Place already exists — merge practice area context
+          const existing = allPlaces.find(p => p.id === place.id);
+          if (existing && existing._searchContext && !existing._searchContext.includes(slug)) {
+            existing._searchContext += `,${slug}`;
+          }
+        }
+      }
+    } catch (error) {
+      console.error(`Error fetching practice area "${slug}" for ${cityName}:`, error);
+      // Continue with other practice areas
+    }
+  }
+
+  return { places: allPlaces, apiCalls };
 }
 
 // ==========================================
@@ -338,11 +475,97 @@ export async function fetchLawyersSmart(
 }
 
 // ==========================================
+// COMPREHENSIVE FETCH (Nearby + Practice Area Text Searches)
+// ==========================================
+
+/**
+ * Full fetch for a city: Nearby search + Text Search per practice area.
+ * This gives us BOTH broad coverage AND specific practice area tagging.
+ *
+ * The Nearby search gives all lawyers in the area (tagged 'general' unless
+ * their name contains keywords). The Text Searches give specific practice
+ * area attorneys that Google recognizes as specialists.
+ *
+ * Results are deduped by Place ID. If an attorney appears in both a
+ * Nearby search and a Text Search, the practice area from the Text Search
+ * is added to their practiceAreas array.
+ */
+export async function fetchLawyersComprehensive(
+  cityName: string,
+  stateCode: string,
+  latitude: number,
+  longitude: number,
+  apiKey: string,
+  population?: number,
+  options?: {
+    practiceAreaSlugs?: string[];  // which practice areas to text-search (default: all)
+    skipNearbySearch?: boolean;    // skip the generic Nearby search
+    strategy?: FetchStrategy;
+  }
+): Promise<{
+  places: GooglePlaceResultWithContext[];
+  strategy: FetchStrategy;
+  totalApiCalls: number;
+  nearbyCount: number;
+  textSearchCount: number;
+}> {
+  const seenIds = new Map<string, GooglePlaceResultWithContext>();
+  let totalApiCalls = 0;
+  let nearbyCount = 0;
+  let textSearchCount = 0;
+  let usedStrategy: FetchStrategy = 'single';
+
+  // Step 1: Standard nearby search for broad coverage
+  if (!options?.skipNearbySearch) {
+    const { places, strategy, apiCalls } = await fetchLawyersSmart(
+      latitude, longitude, apiKey, population, options?.strategy
+    );
+    totalApiCalls += apiCalls;
+    usedStrategy = strategy;
+    nearbyCount = places.length;
+
+    for (const place of places) {
+      seenIds.set(place.id, { ...place, _searchContext: undefined });
+    }
+  }
+
+  // Step 2: Text Search per practice area for specific tagging
+  const { places: textPlaces, apiCalls: textApiCalls } = await fetchLawyersByPracticeArea(
+    cityName, stateCode, latitude, longitude, apiKey,
+    options?.practiceAreaSlugs
+  );
+  totalApiCalls += textApiCalls;
+  textSearchCount = textPlaces.length;
+
+  for (const place of textPlaces) {
+    const existing = seenIds.get(place.id);
+    if (existing) {
+      // Merge practice area context into existing entry
+      const existingCtx = existing._searchContext || '';
+      const newCtx = place._searchContext || '';
+      const allContexts = Array.from(new Set([...existingCtx.split(','), ...newCtx.split(',')].filter(Boolean)));
+      existing._searchContext = allContexts.join(',');
+    } else {
+      seenIds.set(place.id, place);
+    }
+  }
+
+  return {
+    places: Array.from(seenIds.values()),
+    strategy: usedStrategy,
+    totalApiCalls,
+    nearbyCount,
+    textSearchCount,
+  };
+}
+
+// ==========================================
 // PARSE GOOGLE PLACE TO ATTORNEY
 // ==========================================
 
-export function parseGooglePlace(place: GooglePlaceResult): ParsedAttorney {
+export function parseGooglePlace(place: GooglePlaceResultWithContext): ParsedAttorney {
   const displayName = place.displayName?.text || 'Unknown Office';
+  const primaryTypeDisplay = place.primaryTypeDisplayName?.text || '';
 
   // Parse secondary hours (primary source)
   let parsedHours = parseGoogleSecondaryHours(place.regularSecondaryOpeningHours || []);
@@ -352,6 +575,23 @@ export function parseGooglePlace(place: GooglePlaceResult): ParsedAttorney {
   if (parsedHours.length === 0 && place.regularOpeningHours?.periods) {
     parsedHours = parseRegularOpeningHours(place.regularOpeningHours.periods);
   }
+
+  // Build practice areas from multiple signals:
+  // 1. Keywords in display name (existing logic)
+  // 2. Keywords in primaryTypeDisplayName (e.g., "Tax attorney")
+  // 3. Text search context (which practice area search found this result)
+  const nameAreas = classifyPracticeAreas(displayName);
+  const typeAreas = primaryTypeDisplay ? classifyPracticeAreas(primaryTypeDisplay) : [];
+  
+  // Parse text search context areas
+  const contextAreas = place._searchContext
+    ? place._searchContext.split(',').filter(Boolean)
+    : [];
+
+  // Merge all practice areas, remove duplicates, remove 'general' if we have specific areas
+  const allAreas = Array.from(new Set([...nameAreas, ...typeAreas, ...contextAreas]));
+  const specificAreas = allAreas.filter(a => a !== 'general');
+  const practiceAreas = specificAreas.length > 0 ? specificAreas : ['general'];
 
   return {
     googlePlaceId: place.id,
@@ -385,8 +625,8 @@ export function parseGooglePlace(place: GooglePlaceResult): ParsedAttorney {
     wheelchairAccessibleRestroom: place.accessibilityOptions?.wheelchairAccessibleRestroom ?? null,
     wheelchairAccessibleSeating: place.accessibilityOptions?.wheelchairAccessibleSeating ?? null,
 
-    // Classified practice areas
-    practiceAreas: classifyPracticeAreas(displayName),
+    // Classified practice areas (enhanced with multiple signals)
+    practiceAreas,
 
     // Parsed secondary hours
     secondaryHours: parsedHours.map((w) => ({

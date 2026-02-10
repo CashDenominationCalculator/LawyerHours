@@ -62,8 +62,11 @@ export async function getAttorneysByCityAndPracticeArea(
   practiceAreaSlug: string
 ): Promise<AttorneyWithHours[]> {
   const all = await getAttorneysByCity(citySlug);
+  // Only return attorneys that specifically match the requested practice area.
+  // Do NOT include all "general" attorneys — that defeats the purpose of filtering.
+  // An attorney tagged "general" only appears if no specific practice area was found.
   return all.filter(
-    (a) => a.practiceAreas.includes(practiceAreaSlug) || a.practiceAreas.includes('general')
+    (a) => a.practiceAreas.includes(practiceAreaSlug)
   );
 }
 
