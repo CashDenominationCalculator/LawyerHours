@@ -10,6 +10,9 @@ export const metadata: Metadata = {
   },
   description: 'Find attorneys available right now — evening hours, weekend appointments, and emergency legal help. Stop waiting until Monday.',
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || 'https://lawyerhours.com'),
+  verification: {
+    google: 'G5LYKYhQHRaBSxj0H0fNWrGGASiSnP8DVxZMC3PX7u8',
+  },
   openGraph: {
     type: 'website',
     siteName: 'LawyerHours',
