@@ -485,7 +485,7 @@ export default function AttorneyCard({ attorney, availability, variant = 'standa
       </div>
 
       {/* === AT-A-GLANCE DATA CARD === */}
-      {(attorney.secondaryHours.length > 0 || parkingItems.length > 0 || paymentItems.length > 0 || accessItems.length > 0) && (
+      {attorney.secondaryHours.length > 0 && (
         <div className="bg-white border border-gray-200 rounded-lg overflow-hidden mb-4">
           <div className="grid grid-cols-2 sm:grid-cols-4 divide-x divide-gray-100">
             {/* Hours */}
@@ -503,8 +503,8 @@ export default function AttorneyCard({ attorney, availability, variant = 'standa
             {/* Latest close */}
             <div className="p-3 text-center">
               <div className="text-xs font-semibold text-gray-500 uppercase mb-1">Latest Close</div>
-              <div className="text-xl font-bold text-indigo-700">{latestClose > 0 ? formatHourDisplay(latestClose, latestCloseMinute) : 'N/A'}</div>
-              <div className="text-xs text-gray-500">{latestDay || ''}</div>
+              <div className="text-xl font-bold text-indigo-700">{formatHourDisplay(latestClose, latestCloseMinute)}</div>
+              <div className="text-xs text-gray-500">{latestDay}</div>
             </div>
             {/* Amenities count */}
             <div className="p-3 text-center">
