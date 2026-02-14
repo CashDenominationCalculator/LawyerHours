@@ -6,6 +6,7 @@ import {
   getUniqueStates,
   SITE_URL,
 } from '@/lib/constants';
+import { getArticleContent } from '@/lib/article-content';
 import CityPageContent from './CityPageContent';
 import PracticeAreaCityPageContent from './PracticeAreaCityPageContent';
 import StateOverviewPageContent from './StateOverviewPageContent';
@@ -74,8 +75,9 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   if (route.type === 'practiceAreaCity') {
     const pa = getPracticeAreaBySlug(route.paSlug)!;
     const city = getCityBySlug(route.citySlug)!;
-    const title = `${pa.displayName} Attorneys with Evening & Weekend Hours in ${city.name}, ${city.stateCode}`;
-    const description = `Find ${pa.displayName.toLowerCase()} attorneys in ${city.name}, ${city.stateCode} with evening consultations, weekend appointments, and emergency availability.`;
+    const article = getArticleContent(route.paSlug, route.citySlug);
+    const title = article?.metaTitle || `${pa.displayName} Attorneys with Evening & Weekend Hours in ${city.name}, ${city.stateCode}`;
+    const description = article?.metaDescription || `Find ${pa.displayName.toLowerCase()} attorneys in ${city.name}, ${city.stateCode} with evening consultations, weekend appointments, and emergency availability.`;
     return {
       title,
       description,

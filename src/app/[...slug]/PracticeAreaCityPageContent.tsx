@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { getCityBySlug, getPracticeAreaBySlug, PRACTICE_AREAS, SITE_URL } from '@/lib/constants';
 import { getAttorneysByCityAndPracticeArea, computeStats } from '@/lib/data';
+import { getArticleContent } from '@/lib/article-content';
 import AttorneyCard from '@/components/AttorneyCard';
 import AvailableNowBanner from '@/components/AvailableNowBanner';
 import StatisticsSection from '@/components/StatisticsSection';
@@ -17,12 +18,14 @@ export default async function PracticeAreaCityPageContent({ paSlug, citySlug }: 
   const city = getCityBySlug(citySlug)!;
   const attorneys = await getAttorneysByCityAndPracticeArea(citySlug, paSlug);
   const stats = computeStats(attorneys);
+  const article = getArticleContent(paSlug, citySlug);
 
   const editorial = pa.editorial
     .replace(/{city}/g, city.name)
     .replace(/{state}/g, city.stateName);
 
-  const faqs = [
+  // Standard auto-generated FAQs
+  const baseFaqs = [
     {
       question: `How many ${pa.displayName.toLowerCase()} attorneys in ${city.name} offer evening hours?`,
       answer: `Currently, ${stats.eveningCount} out of ${stats.total} ${pa.displayName.toLowerCase()} attorneys in ${city.name}, ${city.stateCode} offer evening consultation hours after 5pm.`,
@@ -41,6 +44,12 @@ export default async function PracticeAreaCityPageContent({ paSlug, citySlug }: 
     },
   ];
 
+  // Merge additional article FAQs if available
+  const faqs = article
+    ? [...article.additionalFaqs, ...baseFaqs]
+    : baseFaqs;
+
+  // Schema: BreadcrumbList
   const breadcrumbSchema = {
     '@context': 'https://schema.org',
     '@type': 'BreadcrumbList',
@@ -51,19 +60,99 @@ export default async function PracticeAreaCityPageContent({ paSlug, citySlug }: 
     ],
   };
 
+  // Schema: Article (EEAT - helps Google understand this is editorial content)
+  const articleSchema = article ? {
+    '@context': 'https://schema.org',
+    '@type': 'Article',
+    headline: article.metaTitle,
+    description: article.metaDescription,
+    dateModified: new Date().toISOString(),
+    datePublished: '2026-02-10T00:00:00.000Z',
+    author: {
+      '@type': 'Organization',
+      name: 'LawyerHours',
+      url: SITE_URL,
+    },
+    publisher: {
+      '@type': 'Organization',
+      name: 'LawyerHours',
+      url: SITE_URL,
+    },
+    mainEntityOfPage: {
+      '@type': 'WebPage',
+      '@id': `${SITE_URL}/${pa.slug}-attorney/${city.slug}`,
+    },
+    about: {
+      '@type': 'LegalService',
+      name: `${pa.displayName} Attorneys in ${city.name}, ${city.stateCode}`,
+      areaServed: {
+        '@type': 'City',
+        name: city.name,
+        addressRegion: city.stateCode,
+        addressCountry: 'US',
+      },
+    },
+  } : null;
+
+  // Schema: LegalService for each attorney with hours
+  const legalServiceSchemas = attorneys.slice(0, 20).map((attorney) => ({
+    '@context': 'https://schema.org',
+    '@type': 'LegalService',
+    name: attorney.displayName,
+    address: attorney.formattedAddress ? {
+      '@type': 'PostalAddress',
+      streetAddress: attorney.formattedAddress,
+      addressLocality: city.name,
+      addressRegion: city.stateCode,
+      addressCountry: 'US',
+    } : undefined,
+    geo: {
+      '@type': 'GeoCoordinates',
+      latitude: attorney.latitude,
+      longitude: attorney.longitude,
+    },
+    url: attorney.websiteUri || attorney.googleMapsUri || undefined,
+    areaServed: {
+      '@type': 'City',
+      name: city.name,
+    },
+  }));
+
+  const sectionIconMap: Record<string, string> = {
+    jurisdiction: '🏛️',
+    guide: '📋',
+    process: '🔄',
+    cost: '💰',
+    tip: '💡',
+  };
+
   return (
     <>
+      {/* Structured Data */}
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema) }}
       />
+      {articleSchema && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(articleSchema) }}
+        />
+      )}
+      {legalServiceSchemas.length > 0 && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(legalServiceSchemas) }}
+        />
+      )}
 
       {stats.availableNow.length > 0 && (
         <AvailableNowBanner count={stats.availableNow.length} cityName={city.name} />
       )}
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <nav className="text-sm text-gray-500 mb-6">
+        {/* Breadcrumb */}
+        <nav className="text-sm text-gray-500 mb-6" aria-label="Breadcrumb">
           <Link href="/" className="hover:text-gray-700">Home</Link>
           <span className="mx-2">›</span>
           <Link href={`/${pa.slug}-attorney/${city.stateSlug}`} className="hover:text-gray-700">
@@ -77,17 +166,44 @@ export default async function PracticeAreaCityPageContent({ paSlug, citySlug }: 
           <span className="text-gray-900">{pa.displayName}</span>
         </nav>
 
+        {/* H1 */}
         <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-2">
-          {pa.displayName} Attorneys with Evening & Weekend Hours in {city.name}, {city.stateCode}
+          {pa.displayName} Attorneys with Evening &amp; Weekend Hours in {city.name}, {city.stateCode}
         </h1>
-        <p className="text-lg text-gray-600 mb-6">
+        <p className="text-lg text-gray-600 mb-4">
           {stats.total} attorneys found — {stats.eveningCount} evening, {stats.weekendCount} weekend, {stats.emergencyCount} emergency
         </p>
 
-        {/* Editorial */}
-        <div className="bg-amber-50 border border-amber-100 rounded-xl p-6 mb-8">
-          <p className="text-gray-700 leading-relaxed">{editorial}</p>
-        </div>
+        {/* EEAT: Last updated + author attribution */}
+        {article && (
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-500 mb-6">
+            <span>Last reviewed: <strong className="text-gray-700">{article.lastReviewed}</strong></span>
+            <span className="hidden sm:inline">·</span>
+            <span>By <strong className="text-gray-700">{article.reviewedBy}</strong></span>
+            <span className="hidden sm:inline">·</span>
+            <span>{stats.total} attorneys verified via Google Places</span>
+          </div>
+        )}
+
+        {/* Introduction - article content or editorial fallback */}
+        {article ? (
+          <div className="bg-white border border-gray-200 rounded-xl p-6 sm:p-8 mb-8 prose prose-gray max-w-none">
+            <div dangerouslySetInnerHTML={{ __html: article.introHtml }} />
+          </div>
+        ) : (
+          <div className="bg-amber-50 border border-amber-100 rounded-xl p-6 mb-8">
+            <p className="text-gray-700 leading-relaxed">{editorial}</p>
+          </div>
+        )}
+
+        {/* Quick Stats Bar */}
+        <StatisticsSection
+          cityName={city.name}
+          totalAttorneys={stats.total}
+          eveningCount={stats.eveningCount}
+          weekendCount={stats.weekendCount}
+          emergencyCount={stats.emergencyCount}
+        />
 
         {/* Available Now */}
         {stats.availableNow.length > 0 && (
@@ -139,19 +255,78 @@ export default async function PracticeAreaCityPageContent({ paSlug, citySlug }: 
           )}
         </section>
 
-        <StatisticsSection
-          cityName={city.name}
-          totalAttorneys={stats.total}
-          eveningCount={stats.eveningCount}
-          weekendCount={stats.weekendCount}
-          emergencyCount={stats.emergencyCount}
-        />
+        {/* ============================================ */}
+        {/* EEAT ARTICLE CONTENT - Rich, helpful guide   */}
+        {/* ============================================ */}
+        {article && (
+          <article className="mb-12">
+            <div className="border-t border-gray-200 pt-10">
+              <h2 className="text-2xl font-bold text-gray-900 mb-2">
+                Guide: {pa.displayName} in {city.name}, {city.stateCode}
+              </h2>
+              <p className="text-gray-500 text-sm mb-8">
+                A practical overview of {pa.displayName.toLowerCase()} in {city.name} — court locations, filing costs, key statutes, and what to expect.
+              </p>
 
+              <div className="space-y-10">
+                {article.sections.map((section, i) => (
+                  <section key={i} className="bg-white border border-gray-200 rounded-xl p-6 sm:p-8">
+                    <h3 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
+                      <span>{sectionIconMap[section.type || 'guide'] || '📋'}</span>
+                      {section.heading}
+                    </h3>
+                    <div
+                      className="prose prose-gray max-w-none prose-li:marker:text-gray-400 prose-a:text-blue-600 prose-th:text-left"
+                      dangerouslySetInnerHTML={{ __html: section.content }}
+                    />
+                  </section>
+                ))}
+              </div>
+
+              {/* Jurisdiction Notice - EEAT/YMYL compliance */}
+              <div className="mt-8 bg-blue-50 border border-blue-100 rounded-xl p-5">
+                <div className="flex items-start gap-3">
+                  <span className="text-blue-600 text-lg mt-0.5">⚖️</span>
+                  <div>
+                    <p className="text-sm font-semibold text-blue-800 mb-1">Jurisdiction Notice</p>
+                    <p className="text-sm text-blue-700">{article.jurisdictionNote}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Sources - EEAT credibility */}
+              <div className="mt-6 bg-gray-50 border border-gray-100 rounded-xl p-5">
+                <p className="text-sm font-semibold text-gray-700 mb-2">Sources</p>
+                <div dangerouslySetInnerHTML={{ __html: article.sourcesHtml }} />
+              </div>
+            </div>
+          </article>
+        )}
+
+        {/* Lead Form */}
         <div className="my-12">
           <LeadForm sourcePageUrl={`/${pa.slug}-attorney/${city.slug}`} />
         </div>
 
+        {/* FAQ Section */}
         <FAQSection faqs={faqs} />
+
+        {/* YMYL Legal Disclaimer */}
+        <div className="mt-8 mb-12 bg-gray-50 border border-gray-200 rounded-xl p-5">
+          <div className="flex items-start gap-3">
+            <span className="text-gray-400 text-lg mt-0.5">ℹ️</span>
+            <div>
+              <p className="text-sm font-semibold text-gray-700 mb-1">Legal Disclaimer</p>
+              <p className="text-xs text-gray-500 leading-relaxed">
+                The information on this page is for general informational purposes only and does not constitute legal advice.
+                No attorney-client relationship is formed by using this directory. Attorney availability, hours, and contact details
+                are sourced from Google Places and may change without notice. Always verify information directly with the
+                attorney&apos;s office. If you are experiencing a legal emergency, contact local law enforcement or call 911.
+                For legal aid in San Diego County, contact the <a href="https://www.lassd.org/" className="text-blue-500 hover:underline" target="_blank" rel="nofollow noopener">Legal Aid Society of San Diego</a>.
+              </p>
+            </div>
+          </div>
+        </div>
 
         {/* Related Practice Areas */}
         <section className="py-8">
@@ -171,6 +346,7 @@ export default async function PracticeAreaCityPageContent({ paSlug, citySlug }: 
           </div>
         </section>
 
+        {/* Back links */}
         <div className="py-8 flex flex-wrap gap-4">
           <Link
             href={`/${city.slug}`}
