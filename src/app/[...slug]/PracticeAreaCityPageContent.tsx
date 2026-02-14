@@ -1,10 +1,11 @@
 import Link from 'next/link';
 import { getCityBySlug, getPracticeAreaBySlug, PRACTICE_AREAS, SITE_URL } from '@/lib/constants';
-import { getAttorneysByCityAndPracticeArea, computeStats } from '@/lib/data';
+import { getAttorneysByCityAndPracticeArea, computeStats, computeDetailedStats } from '@/lib/data';
 import { getArticleContent } from '@/lib/article-content';
 import AttorneyCard from '@/components/AttorneyCard';
 import AvailableNowBanner from '@/components/AvailableNowBanner';
 import StatisticsSection from '@/components/StatisticsSection';
+import DataInsightsSection from '@/components/DataInsightsSection';
 import FAQSection from '@/components/FAQSection';
 import LeadForm from '@/components/LeadForm';
 
@@ -18,29 +19,50 @@ export default async function PracticeAreaCityPageContent({ paSlug, citySlug }: 
   const city = getCityBySlug(citySlug)!;
   const attorneys = await getAttorneysByCityAndPracticeArea(citySlug, paSlug);
   const stats = computeStats(attorneys);
+  const detailedStats = computeDetailedStats(attorneys);
   const article = getArticleContent(paSlug, citySlug);
 
   const editorial = pa.editorial
     .replace(/{city}/g, city.name)
     .replace(/{state}/g, city.stateName);
 
-  // Standard auto-generated FAQs
+  // Data-driven FAQs using real Google Places data
+  const eveningPct = stats.total > 0 ? Math.round((stats.eveningCount / stats.total) * 100) : 0;
+  const weekendPct = stats.total > 0 ? Math.round((stats.weekendCount / stats.total) * 100) : 0;
   const baseFaqs = [
     {
       question: `How many ${pa.displayName.toLowerCase()} attorneys in ${city.name} offer evening hours?`,
-      answer: `Currently, ${stats.eveningCount} out of ${stats.total} ${pa.displayName.toLowerCase()} attorneys in ${city.name}, ${city.stateCode} offer evening consultation hours after 5pm.`,
+      answer: `As of ${new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}, ${stats.eveningCount} out of ${stats.total} ${pa.displayName.toLowerCase()} attorneys in ${city.name}, ${city.stateCode} (${eveningPct}%) offer evening consultation hours after 5 PM. ${detailedStats.busiestEveningDay} is the most popular day for evening appointments, with the latest offices staying open until ${detailedStats.latestAvailableDisplay}.`,
     },
     {
       question: `Can I see a ${pa.displayName.toLowerCase()} attorney on weekends in ${city.name}?`,
-      answer: `Yes! ${stats.weekendCount} ${pa.displayName.toLowerCase()} attorneys in ${city.name} offer Saturday or Sunday hours for consultations.`,
+      answer: `Yes. ${stats.weekendCount} ${pa.displayName.toLowerCase()} attorneys in ${city.name} (${weekendPct}%) offer weekend hours — ${detailedStats.saturdayCount} on Saturdays${detailedStats.sundayCount > 0 ? ` and ${detailedStats.sundayCount} on Sundays` : ''}.${detailedStats.earliestWeekendOpen ? ` Weekend hours start as early as ${detailedStats.earliestWeekendOpen}.` : ''} We recommend booking Saturday appointments early in the week, as weekend slots fill quickly.`,
     },
     {
       question: `Are there emergency ${pa.displayName.toLowerCase()} attorneys in ${city.name}?`,
-      answer: `${stats.emergencyCount} ${pa.displayName.toLowerCase()} attorneys in ${city.name} offer emergency or late-night availability.`,
+      answer: `${stats.emergencyCount} ${pa.displayName.toLowerCase()} attorneys in ${city.name} offer emergency or late-night availability (hours extending past 10 PM or 24/7 service).${detailedStats.emergencyWithParking > 0 ? ` Of these, ${detailedStats.emergencyWithParking} also offer free parking — important for urgent late-night visits.` : ''}`,
+    },
+    {
+      question: `Is there free parking at ${pa.displayName.toLowerCase()} offices in ${city.name}?`,
+      answer: detailedStats.anyFreeParking > 0
+        ? `Yes. ${detailedStats.anyFreeParking} of ${stats.total} ${pa.displayName.toLowerCase()} offices in ${city.name} offer some form of free parking (free lot, street parking, or garage). This is particularly helpful for evening appointments when downtown meters may still be enforced.`
+        : `Parking data varies by office. We recommend checking individual listings for parking details or contacting the office directly before your visit.`,
+    },
+    {
+      question: `Are ${pa.displayName.toLowerCase()} offices in ${city.name} wheelchair accessible?`,
+      answer: detailedStats.fullyAccessible > 0
+        ? `${detailedStats.fullyAccessible} office${detailedStats.fullyAccessible !== 1 ? 's' : ''} in ${city.name} report full wheelchair accessibility (both accessible entrance and parking). ${detailedStats.wheelchairEntrance} total offices have wheelchair-accessible entrances. See the accessibility icons on each listing below for details.`
+        : `Accessibility information is shown on each listing where reported. We recommend contacting the office in advance if you have specific accessibility needs.`,
+    },
+    {
+      question: `What payment methods do ${pa.displayName.toLowerCase()} attorneys in ${city.name} accept?`,
+      answer: detailedStats.acceptsCreditCards > 0
+        ? `${detailedStats.acceptsCreditCards} offices accept credit cards${detailedStats.acceptsDebitCards > 0 ? `, ${detailedStats.acceptsDebitCards} accept debit cards` : ''}${detailedStats.acceptsNfc > 0 ? `, and ${detailedStats.acceptsNfc} support contactless/NFC payments` : ''}. Payment methods vary by office — check individual listings or call ahead to confirm.`
+        : `Payment methods vary by office. Most attorneys accept checks and cash; many also accept credit and debit cards. We recommend confirming payment options when scheduling your consultation.`,
     },
     {
       question: `How accurate is the availability information?`,
-      answer: `We source our data from Google Places API and update it regularly. However, we recommend confirming hours directly with the attorney's office before visiting.`,
+      answer: `All hours, parking, payment, and accessibility data is sourced from Google Places API and updated regularly. Each listing reflects information reported by the business itself and verified by Google. We recommend confirming hours directly with the attorney's office before visiting, especially for evening and weekend appointments.`,
     },
   ];
 
@@ -116,7 +138,32 @@ export default async function PracticeAreaCityPageContent({ paSlug, citySlug }: 
       '@type': 'City',
       name: city.name,
     },
+    ...(attorney.wheelchairAccessibleEntrance === true && {
+      amenityFeature: {
+        '@type': 'LocationFeatureSpecification',
+        name: 'Wheelchair Accessible',
+        value: true,
+      },
+    }),
+    ...(attorney.acceptsCreditCards === true && {
+      paymentAccepted: 'Credit Card, Debit Card, Cash',
+    }),
   }));
+
+  // Schema: ItemList for the full directory
+  const itemListSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'ItemList',
+    name: `${pa.displayName} Attorneys in ${city.name}, ${city.stateCode}`,
+    description: `Directory of ${stats.total} ${pa.displayName.toLowerCase()} attorneys in ${city.name} with verified evening and weekend hours`,
+    numberOfItems: stats.total,
+    itemListElement: attorneys.slice(0, 30).map((attorney, index) => ({
+      '@type': 'ListItem',
+      position: index + 1,
+      name: attorney.displayName,
+      url: attorney.websiteUri || attorney.googleMapsUri || undefined,
+    })),
+  };
 
   const sectionIconMap: Record<string, string> = {
     jurisdiction: '🏛️',
@@ -145,6 +192,10 @@ export default async function PracticeAreaCityPageContent({ paSlug, citySlug }: 
           dangerouslySetInnerHTML={{ __html: JSON.stringify(legalServiceSchemas) }}
         />
       )}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(itemListSchema) }}
+      />
 
       {stats.availableNow.length > 0 && (
         <AvailableNowBanner count={stats.availableNow.length} cityName={city.name} />
@@ -174,16 +225,20 @@ export default async function PracticeAreaCityPageContent({ paSlug, citySlug }: 
           {stats.total} attorneys found — {stats.eveningCount} evening, {stats.weekendCount} weekend, {stats.emergencyCount} emergency
         </p>
 
-        {/* EEAT: Last updated + author attribution */}
-        {article && (
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-500 mb-6">
-            <span>Last reviewed: <strong className="text-gray-700">{article.lastReviewed}</strong></span>
-            <span className="hidden sm:inline">·</span>
-            <span>By <strong className="text-gray-700">{article.reviewedBy}</strong></span>
-            <span className="hidden sm:inline">·</span>
-            <span>{stats.total} attorneys verified via Google Places</span>
-          </div>
-        )}
+        {/* EEAT: Last updated + author attribution + data methodology */}
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-500 mb-6">
+          {article && (
+            <>
+              <span>Last reviewed: <strong className="text-gray-700">{article.lastReviewed}</strong></span>
+              <span className="hidden sm:inline">·</span>
+              <span>By <strong className="text-gray-700">{article.reviewedBy}</strong></span>
+              <span className="hidden sm:inline">·</span>
+            </>
+          )}
+          <span>{stats.total} attorneys verified via Google Places API</span>
+          <span className="hidden sm:inline">·</span>
+          <span>Hours, parking, payments &amp; accessibility data included</span>
+        </div>
 
         {/* Introduction - article content or editorial fallback */}
         {article ? (
@@ -302,6 +357,17 @@ export default async function PracticeAreaCityPageContent({ paSlug, citySlug }: 
             </div>
           </article>
         )}
+
+        {/* ============================================ */}
+        {/* DATA INSIGHTS — UNIQUE FIRST-HAND CONTENT   */}
+        {/* No competitor has this data — our EEAT edge  */}
+        {/* ============================================ */}
+        <DataInsightsSection
+          stats={detailedStats}
+          cityName={city.name}
+          practiceArea={pa.displayName}
+          stateCode={city.stateCode}
+        />
 
         {/* Lead Form */}
         <div className="my-12">

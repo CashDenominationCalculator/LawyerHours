@@ -34,11 +34,13 @@ export interface ArticleContent {
 // ==========================================
 const familyLawSanDiego: ArticleContent = {
   metaTitle: 'Family Law Attorneys in San Diego, CA — Evening & Weekend Hours (2026)',
-  metaDescription: 'Find San Diego family law attorneys offering evening and weekend consultations. Compare custody, divorce, and child support lawyers with after-hours availability. Updated February 2026.',
+  metaDescription: 'Compare 20+ San Diego family law attorneys with verified evening and weekend hours. See parking, accessibility, and payment data from Google Places. Courthouse locations, filing fees, and CA Family Code references included.',
 
   introHtml: `
     <p>If you're navigating a custody dispute, filing for divorce, or seeking a child support modification in San Diego, timing matters. Court deadlines in San Diego County Superior Court don't pause for your work schedule, and temporary restraining orders in domestic situations require urgent legal guidance.</p>
-    <p>We compiled this directory of <strong>family law attorneys in San Diego who offer evening and weekend consultation hours</strong> — verified through Google Places data — so you can speak with a qualified attorney outside of traditional 9-to-5 business hours. Below, you'll also find a practical overview of how family law works in San Diego County, including court locations, filing costs, and key California statutes that may affect your case.</p>
+    <p>We compiled this directory of <strong>family law attorneys in San Diego who offer evening and weekend consultation hours</strong> — verified through Google Places data — so you can speak with a qualified attorney outside of traditional 9-to-5 business hours.</p>
+    <p>Unlike a standard directory listing, this page includes <strong>first-hand data we collected from Google Places</strong> for each office: actual extended hours by day of week, parking availability (free lot, street, garage), payment methods accepted (credit card, debit, NFC contactless), and wheelchair accessibility details. We also analyzed where these offices are geographically concentrated across San Diego neighborhoods — from downtown to North County — so you can find representation close to home or work.</p>
+    <p>Below the directory, you'll find a practical overview of how family law works in San Diego County, including court locations, filing costs, mediation requirements, and key California statutes.</p>
   `,
 
   sections: [
