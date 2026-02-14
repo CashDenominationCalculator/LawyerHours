@@ -239,12 +239,12 @@ export default async function PracticeAreaCityPageContent({ paSlug, citySlug }: 
         </p>
 
         {/* EEAT: Last updated + author attribution + data methodology */}
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-500 mb-6">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-base text-gray-600 mb-6">
           {article && (
             <>
-              <span>Last reviewed: <strong className="text-gray-700">{article.lastReviewed}</strong></span>
+              <span>Last reviewed: <strong className="text-gray-800">{article.lastReviewed}</strong></span>
               <span className="hidden sm:inline">·</span>
-              <span>By <strong className="text-gray-700">{article.reviewedBy}</strong></span>
+              <span>By <strong className="text-gray-800">{article.reviewedBy}</strong></span>
               <span className="hidden sm:inline">·</span>
             </>
           )}
@@ -401,12 +401,12 @@ export default async function PracticeAreaCityPageContent({ paSlug, citySlug }: 
         <FAQSection faqs={faqs} />
 
         {/* YMYL Legal Disclaimer */}
-        <div className="mt-8 mb-12 bg-gray-50 border border-gray-200 rounded-xl p-5">
+        <div className="mt-8 mb-12 bg-gray-50 border border-gray-200 rounded-xl p-6">
           <div className="flex items-start gap-3">
-            <span className="text-gray-400 text-lg mt-0.5">ℹ️</span>
+            <span className="text-gray-500 text-lg mt-0.5">ℹ️</span>
             <div>
-              <p className="text-sm font-semibold text-gray-700 mb-1">Legal Disclaimer</p>
-              <p className="text-xs text-gray-500 leading-relaxed">
+              <p className="text-base font-bold text-gray-700 mb-2">Legal Disclaimer</p>
+              <p className="text-sm text-gray-600 leading-relaxed">
                 The information on this page is for general informational purposes only and does not constitute legal advice.
                 No attorney-client relationship is formed by using this directory. Attorney availability, hours, and contact details
                 are sourced from Google Places and may change without notice. Always verify information directly with the

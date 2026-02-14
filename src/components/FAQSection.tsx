@@ -33,11 +33,11 @@ export default function FAQSection({ faqs }: FAQSectionProps) {
       <div className="space-y-4">
         {faqs.map((faq, i) => (
           <details key={i} className="group bg-white rounded-lg border border-gray-200 overflow-hidden">
-            <summary className="flex items-center justify-between cursor-pointer px-6 py-4 font-medium text-gray-900 hover:bg-gray-50">
+            <summary className="flex items-center justify-between cursor-pointer px-6 py-4 text-base font-semibold text-gray-900 hover:bg-gray-50">
               <span>{faq.question}</span>
               <span className="ml-4 text-gray-400 group-open:rotate-180 transition-transform">▼</span>
             </summary>
-            <div className="px-6 pb-4 text-gray-600 leading-relaxed">
+            <div className="px-6 pb-4 text-base text-gray-700 leading-relaxed">
               {faq.answer}
             </div>
           </details>

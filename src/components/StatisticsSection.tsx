@@ -69,9 +69,9 @@ export default function StatisticsSection({
             <div className={`text-3xl font-bold ${stat.color}`}>
               {stat.value}{stat.suffix}
             </div>
-            <div className="text-sm font-medium text-gray-600 mt-1">{stat.label}</div>
+            <div className="text-base font-semibold text-gray-700 mt-1">{stat.label}</div>
             {stat.sub && (
-              <div className="text-xs text-gray-400 mt-0.5">{stat.sub}</div>
+              <div className="text-sm text-gray-500 mt-0.5">{stat.sub}</div>
             )}
           </div>
         ))}

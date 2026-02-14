@@ -17,13 +17,13 @@ export default function DataInsightsSection({ stats, cityName, practiceArea, sta
     <section className="mb-12">
       <div className="border-t border-gray-200 pt-10">
         <div className="flex items-center gap-2 mb-2">
-          <span className="text-sm font-semibold text-blue-600 uppercase tracking-wider">Data Analysis</span>
-          <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">Verified via Google Places</span>
+          <span className="text-base font-bold text-blue-700 uppercase tracking-wider">Data Analysis</span>
+          <span className="text-sm bg-blue-100 text-blue-800 px-3 py-1 rounded-full font-medium">Verified via Google Places</span>
         </div>
         <h2 className="text-2xl font-bold text-gray-900 mb-2">
           {cityName} {practiceArea} Attorney Availability — By the Numbers
         </h2>
-        <p className="text-sm text-gray-500 mb-8">
+        <p className="text-base text-gray-600 mb-8">
           We analyzed real-time data from {stats.total} {practiceArea.toLowerCase()} offices in {cityName}, {stateCode} to surface insights you won&apos;t find in a standard directory listing.
         </p>
 
@@ -32,7 +32,7 @@ export default function DataInsightsSection({ stats, cityName, practiceArea, sta
           <h3 className="text-lg font-bold text-gray-900 mb-1">
             📊 When Are {cityName} {practiceArea} Attorneys Actually Available?
           </h3>
-          <p className="text-sm text-gray-500 mb-5">Extended hours availability by day of week, based on Google Places verified hours.</p>
+          <p className="text-base text-gray-600 mb-5">Extended hours availability by day of week, based on Google Places verified hours.</p>
 
           <div className="grid grid-cols-7 gap-2 mb-6">
             {stats.dayByDayAvailability.map((day) => {
@@ -59,7 +59,7 @@ export default function DataInsightsSection({ stats, cityName, practiceArea, sta
             })}
           </div>
 
-          <div className="bg-gray-50 rounded-lg p-4 text-sm text-gray-700 space-y-2">
+          <div className="bg-gray-50 rounded-lg p-4 text-base text-gray-700 space-y-3">
             <p>
               <strong>Key finding:</strong> {eveningPct}% of {practiceArea.toLowerCase()} attorneys in {cityName} offer extended evening hours.
               {stats.busiestEveningDay !== stats.leastBusyEveningDay && (
@@ -82,7 +82,7 @@ export default function DataInsightsSection({ stats, cityName, practiceArea, sta
         </div>
 
         {/* ============ THREE-COLUMN INSIGHTS ============ */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
 
           {/* PARKING */}
           {stats.parkingDataAvailable > 0 && (
@@ -90,7 +90,7 @@ export default function DataInsightsSection({ stats, cityName, practiceArea, sta
               <h3 className="text-base font-bold text-gray-900 mb-3 flex items-center gap-2">
                 <span>🅿️</span> Parking Availability
               </h3>
-              <div className="space-y-3 text-sm">
+              <div className="space-y-3 text-base">
                 {stats.anyFreeParking > 0 && (
                   <div className="flex justify-between items-center">
                     <span className="text-gray-600">Free parking available</span>
@@ -100,7 +100,7 @@ export default function DataInsightsSection({ stats, cityName, practiceArea, sta
                 {stats.freeParkingLot > 0 && (
                   <div className="flex justify-between items-center">
                     <span className="text-gray-500 pl-3">↳ Free lot</span>
-                    <span className="font-medium">{stats.freeParkingLot}</span>
+                    <span className="font-bold">{stats.freeParkingLot}</span>
                   </div>
                 )}
                 {stats.freeStreetParking > 0 && (
@@ -127,7 +127,7 @@ export default function DataInsightsSection({ stats, cityName, practiceArea, sta
                     <span className="font-medium">{stats.valetParking}</span>
                   </div>
                 )}
-                <div className="pt-2 border-t border-gray-100 text-xs text-gray-400">
+                <div className="pt-2 border-t border-gray-100 text-sm text-gray-500">
                   Based on {stats.parkingDataAvailable} offices with reported parking data
                 </div>
               </div>
@@ -140,7 +140,7 @@ export default function DataInsightsSection({ stats, cityName, practiceArea, sta
               <h3 className="text-base font-bold text-gray-900 mb-3 flex items-center gap-2">
                 <span>💳</span> Payment Methods Accepted
               </h3>
-              <div className="space-y-3 text-sm">
+              <div className="space-y-3 text-base">
                 {stats.acceptsCreditCards > 0 && (
                   <div className="flex justify-between items-center">
                     <span className="text-gray-600">Credit cards</span>
@@ -165,7 +165,7 @@ export default function DataInsightsSection({ stats, cityName, practiceArea, sta
                     <span className="font-medium text-amber-700">{stats.cashOnly}</span>
                   </div>
                 )}
-                <div className="pt-2 border-t border-gray-100 text-xs text-gray-400">
+                <div className="pt-2 border-t border-gray-100 text-sm text-gray-500">
                   Based on {stats.paymentDataAvailable} offices with reported payment data
                 </div>
               </div>
@@ -178,7 +178,7 @@ export default function DataInsightsSection({ stats, cityName, practiceArea, sta
               <h3 className="text-base font-bold text-gray-900 mb-3 flex items-center gap-2">
                 <span>♿</span> Wheelchair Accessibility
               </h3>
-              <div className="space-y-3 text-sm">
+              <div className="space-y-3 text-base">
                 {stats.wheelchairEntrance > 0 && (
                   <div className="flex justify-between items-center">
                     <span className="text-gray-600">Accessible entrance</span>
@@ -209,7 +209,7 @@ export default function DataInsightsSection({ stats, cityName, practiceArea, sta
                     <span className="font-bold text-green-700">{stats.fullyAccessible}</span>
                   </div>
                 )}
-                <div className="pt-2 border-t border-gray-100 text-xs text-gray-400">
+                <div className="pt-2 border-t border-gray-100 text-sm text-gray-500">
                   Based on {stats.accessibilityDataAvailable} offices with reported accessibility data
                 </div>
               </div>
@@ -276,7 +276,7 @@ export default function DataInsightsSection({ stats, cityName, practiceArea, sta
                 </tbody>
               </table>
             </div>
-            <p className="mt-4 text-xs text-gray-400">
+            <p className="mt-4 text-sm text-gray-500">
               Neighborhood data extracted from verified Google Places addresses. Offices may serve clients from surrounding areas.
             </p>
           </div>
@@ -287,7 +287,7 @@ export default function DataInsightsSection({ stats, cityName, practiceArea, sta
           <h3 className="text-lg font-bold text-gray-900 mb-4">
             💡 Practical Takeaways for Finding a {practiceArea} Attorney in {cityName}
           </h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm text-gray-700">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-base text-gray-700">
             <div className="bg-white/70 rounded-lg p-4">
               <p className="font-semibold text-gray-900 mb-1">Best day for an evening consult</p>
               <p>{stats.busiestEveningDay} has the most offices with extended hours ({
@@ -324,7 +324,7 @@ export default function DataInsightsSection({ stats, cityName, practiceArea, sta
           </div>
         </div>
 
-        <p className="mt-4 text-xs text-gray-400 text-center">
+        <p className="mt-6 text-sm text-gray-500 text-center">
           Data sourced from Google Places API. Parking, payment, accessibility, and hours information is self-reported by businesses and verified by Google.
           Last updated: {new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}.
         </p>
