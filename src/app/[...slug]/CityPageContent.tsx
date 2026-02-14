@@ -95,13 +95,15 @@ export default async function CityPageContent({ citySlug }: Props) {
                 Available Right Now ({stats.availableNow.length})
               </h2>
             </div>
-            <div className="grid gap-4">
-              {stats.availableNow.map((attorney) => (
+            <div className="grid gap-5">
+              {stats.availableNow.map((attorney, index) => (
                 <AttorneyCard
                   key={attorney.id}
                   attorney={attorney}
                   availability={attorney.availability}
                   variant="available-now"
+                  cityName={city.name}
+                  rank={index + 1}
                 />
               ))}
             </div>
@@ -130,12 +132,15 @@ export default async function CityPageContent({ citySlug }: Props) {
                     </Link>
                   )}
                 </div>
-                <div className="grid gap-4">
-                  {paAttorneys.slice(0, 5).map((attorney) => (
+                <div className="grid gap-5">
+                  {paAttorneys.slice(0, 5).map((attorney, index) => (
                     <AttorneyCard
                       key={attorney.id}
                       attorney={attorney}
                       availability={attorney.availability}
+                      cityName={city.name}
+                      practiceAreaSlug={paSlug}
+                      rank={index + 1}
                     />
                   ))}
                 </div>

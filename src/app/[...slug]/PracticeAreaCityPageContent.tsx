@@ -26,6 +26,19 @@ export default async function PracticeAreaCityPageContent({ paSlug, citySlug }: 
     .replace(/{city}/g, city.name)
     .replace(/{state}/g, city.stateName);
 
+  // Build list context for individual attorney cards — enables comparison content
+  const listContext = {
+    totalInList: attorneys.length,
+    eveningCountInList: stats.eveningCount,
+    weekendCountInList: stats.weekendCount,
+    emergencyCountInList: stats.emergencyCount,
+    freeParkinCountInList: attorneys.filter(a =>
+      a.freeParkingLot === true || a.freeStreetParking === true || a.freeGarageParking === true
+    ).length,
+    creditCardCountInList: attorneys.filter(a => a.acceptsCreditCards === true).length,
+    accessibleCountInList: attorneys.filter(a => a.wheelchairAccessibleEntrance === true).length,
+  };
+
   // Data-driven FAQs using real Google Places data
   const eveningPct = stats.total > 0 ? Math.round((stats.eveningCount / stats.total) * 100) : 0;
   const weekendPct = stats.total > 0 ? Math.round((stats.weekendCount / stats.total) * 100) : 0;
@@ -272,13 +285,18 @@ export default async function PracticeAreaCityPageContent({ paSlug, citySlug }: 
                 Available Right Now ({stats.availableNow.length})
               </h2>
             </div>
-            <div className="grid gap-4">
-              {stats.availableNow.map((attorney) => (
+            <div className="grid gap-5">
+              {stats.availableNow.map((attorney, index) => (
                 <AttorneyCard
                   key={attorney.id}
                   attorney={attorney}
                   availability={attorney.availability}
                   variant="available-now"
+                  cityName={city.name}
+                  practiceAreaSlug={paSlug}
+                  practiceAreaName={pa.displayName}
+                  rank={index + 1}
+                  listContext={listContext}
                 />
               ))}
             </div>
@@ -290,12 +308,17 @@ export default async function PracticeAreaCityPageContent({ paSlug, citySlug }: 
           <h2 className="text-2xl font-bold text-gray-900 mb-6">
             All {pa.displayName} Attorneys in {city.name} ({attorneys.length})
           </h2>
-          <div className="grid gap-4">
-            {attorneys.map((attorney) => (
+          <div className="grid gap-5">
+            {attorneys.map((attorney, index) => (
               <AttorneyCard
                 key={attorney.id}
                 attorney={attorney}
                 availability={attorney.availability}
+                cityName={city.name}
+                practiceAreaSlug={paSlug}
+                practiceAreaName={pa.displayName}
+                rank={index + 1}
+                listContext={listContext}
               />
             ))}
           </div>
